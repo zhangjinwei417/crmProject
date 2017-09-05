@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd"
+        >
+	<!-- 读取数据源的配置文件，db.properties -->
+	<bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="location" value="classpath:db.properties"></property>
+	</bean>
+	
+	<!-- 创建dao层 要想注入成功：注入方式有几种。构造注入，set注入【setter方法】。-->
+	<bean id="userDaoImpl" class="com.bjsxt.dao.impl.UserDaoImpl">
+		<property name="sessionFactory" ref="sessionFactory"></property>
+	</bean>
+	<!-- 将dao 层注入到 service层 ：必须有setter方法 -->
+	<bean id="userServiceImpl" class="com.bjsxt.service.impl.UserServiceImpl">
+		<property name="userDaoImpl" ref="userDaoImpl"></property>
+	</bean>
+	
+	<!-- 先去配置datasourc数据源将读取的配置文件中的内容 注意到 DriverManagerDataSource 类中。 -->
+	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="${driver}"></property>
+		<property name="url" value="${url}"></property>
+		<property name="username" value="${username}"></property>
+		<property name="password" value="${password}"></property>
+	</bean>
+	
+	<!-- 配置sessionFactory -->
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+		<!-- 读取配置文件有两种方式第一种使用：configLocation: 但是了，使用configLocation 这种方式，仍然需要hibernate.xml， -->
+		<!-- <property name="configLocation" value="classpath:hibernate.xml"></property> -->
+		<!-- 第二种配置方式  hibernateProperties-->
+		<property name="hibernateProperties">
+			<props>
+				<!-- 定义数据库方言不能省略 -->
+				<prop key="hibernate.dialect">${dialect}</prop>
+				<prop key="hibernate.show_sql">true</prop>
+				<prop key="hibernate.format_sql">true</prop>
+			</props>
+		</property>
+		<!-- 读取实体类的映射文件 -->
+		<property name="mappingResources">
+			<array>
+				<value>com/bjsxt/pojo/User-hibernate.xml</value>
+			</array>
+		</property>
+	</bean>
+	
+	<!--  transactionManager 管理数据库 -->
+	<bean id="transactionManager" class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory"></property>
+	</bean>
+	<!-- 配置事务 -->
+	<tx:advice id="advice">
+		<tx:attributes>
+			<!-- 配置方法哪些方法需要交个事务管理 
+				propagation：事务传播机制，在应用程序中使用同一事务去管理方法，如果程序中没有事务则开启一个新的事务。
+			-->
+			<tx:method name="save*" propagation="REQUIRED"/>
+	    	<tx:method name="update*" propagation="REQUIRED"/>
+	    	<tx:method name="delete*" propagation="REQUIRED"/>
+	    	<!-- 适用于查询 -->
+	    	<tx:method name="*" read-only="true"/>
+		</tx:attributes>
+	</tx:advice>
+	<!-- 配置切面 -->
+	<aop:config>
+		<aop:pointcut expression="execution(* com.bjsxt.service.*.*(..))" id="pointcut"/>
+		<aop:advisor advice-ref="advice" pointcut-ref="pointcut"/>
+	</aop:config>
+	
+	<aop:aspectj-autoproxy proxy-target-class="true"/>
+</beans>
